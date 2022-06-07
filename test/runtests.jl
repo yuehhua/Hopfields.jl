@@ -1,6 +1,9 @@
 using scTransformer
+using CUDA
+using Flux
 using Test
+using Zygote
 
 @testset "scTransformer.jl" begin
-    # Write your tests here.
+    include("hopfield.jl")
 end
