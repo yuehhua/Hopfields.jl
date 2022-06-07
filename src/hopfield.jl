@@ -35,7 +35,7 @@ function HopfieldCore(emb_dim::Int, heads::Int=1;
     virtual_hopfield_dim = heads * head_dim
     virtual_pattern_dim = heads * pattern_dim
 
-    β = fill(1 / sqrt(emb_dim), 1, 1, heads)
+    β = fill(1 / sqrt(emb_dim), heads)
     linear_q = Dense(emb_dim, virtual_hopfield_dim; init=init)
     linear_k = Dense(kdim, virtual_hopfield_dim; bias=bias_kv, init=init)
     linear_v = Dense(vdim, virtual_pattern_dim; bias=bias_kv, init=init)
@@ -45,9 +45,9 @@ end
 
 @functor HopfieldCore
 
-Flux.trainable(l::HopfieldCore) = (l.β, l.linear_q, l.linear_k, l.linear_v, l.out_proj)
+Flux.trainable(l::HopfieldCore) = (l.linear_q, l.linear_k, l.linear_v, l.out_proj)
 
-function (l::HopfieldCore)(query::AbstractArray, key::AbstractArray, value::AbstractArray)
+function (l::HopfieldCore)(query, key, value)
     Qt, q = maybe_layer(l.linear_q, query)
     Kt, k = maybe_layer(l.linear_k, key)
     Vt, v = maybe_layer(l.linear_v, value)
@@ -56,7 +56,7 @@ end
 
 maybe_layer(l, x) = isnothing(x) ? (identity, l.weight) : (l, x)
 
-function attention_score(Qt, Kt, heads::Int, β::AbstractArray, query::AbstractArray, key::AbstractArray)
+function attention_score(Qt, Kt, heads::Int, β::AbstractVector, query::AbstractArray, key::AbstractArray)
     Q = Qt(query)
     K = Kt(key)
     _, targ_len, batch_size = size(Q)
@@ -67,15 +67,16 @@ function attention_score(Qt, Kt, heads::Int, β::AbstractArray, query::AbstractA
     Q = reshape(permutedims(Q, (1, 3, 4, 2)), :, targ_len, heads*batch_size)
     K = reshape(K, :, heads, src_len, batch_size)
     K = reshape(permutedims(K, (1, 3, 4, 2)), :, src_len, heads*batch_size)
+    β = reshape(repeat(β, batch_size), 1, 1, :)
 
-    return repeat(β, 1, 1, batch_size) .* batched_mul(batched_transpose(Q), K)
+    return β .* batched_mul(batched_transpose(Q), K)
 end
 
-function attention_prob(Qt, Kt, heads::Int, β::AbstractArray, query::AbstractArray, key::AbstractArray)
+function attention_prob(Qt, Kt, heads::Int, β::AbstractVector, query::AbstractArray, key::AbstractArray)
     return softmax(attention_score(Qt, Kt, heads, β, query, key), dims=2)
 end
 
-function hopfield_forward(Qt, Kt, Vt, out_proj, heads::Int, β::AbstractArray, query::AbstractArray, key::AbstractArray, value::AbstractArray)
+function hopfield_forward(Qt, Kt, Vt, out_proj, heads::Int, β::AbstractVector, query::AbstractArray, key::AbstractArray, value::AbstractArray)
     Â = attention_prob(Qt, Kt, heads, β, query, key)
     targ_len, src_len, d = size(Â)
     batch_size = d ÷ heads
@@ -83,10 +84,8 @@ function hopfield_forward(Qt, Kt, Vt, out_proj, heads::Int, β::AbstractArray, q
     # (T, S, heads*B) -> (heads*T, S, B)
     Â = reshape(Â, targ_len, src_len, heads, batch_size)
     Â = reshape(permutedims(Â, (3, 1, 2, 4)), heads*targ_len, src_len, batch_size)
-
     V = Vt(value)
-
-    attn_out = batched_mul(Â, batched_transpose(V))
+    attn_out = batched_mul(V, batched_transpose(Â))
     
-    return out_proj(batched_transpose(attn_out))
+    return out_proj(attn_out)
 end
