@@ -4,11 +4,13 @@ using CUDA
 using Flux, NNlib, NNlibCUDA
 using Flux: glorot_uniform
 using Flux: @functor
+using Tullio, KernelAbstractions, CUDAKernels
 
 export
     HopfieldCore
 
 include("utils.jl")
+include("operations.jl")
 include("hopfield.jl")
 
 end

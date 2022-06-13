@@ -29,3 +29,8 @@ end
 batch_size(q::AbstractArray, k, v) = size(q, 3)
 batch_size(q::AbstractMatrix, k::AbstractArray, v) = size(k, 3)
 batch_size(q::AbstractMatrix, k::AbstractMatrix, v::AbstractArray) = size(v, 3)
+
+function relax_dims(X::AbstractArray{T,3}, a_dim::Int, b_dim::Int) where {T}
+    bch_sz = a_dim ÷ b_dim
+    return reshape(X, size(X)[1:2]..., b_dim, bch_sz)
+end
