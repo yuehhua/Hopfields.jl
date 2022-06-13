@@ -8,6 +8,7 @@ using Flux: @functor
 export
     HopfieldCore
 
+include("utils.jl")
 include("hopfield.jl")
 
 end
