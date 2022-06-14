@@ -9,7 +9,8 @@ cuda_tests = [
 ]
 
 tests = [
-    "hopfield.jl",
+    "operations.jl",
+    "layer.jl",
 ]
 
 if CUDA.functional()

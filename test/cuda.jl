@@ -14,7 +14,7 @@
     K = rand(kdim, source_len, batch_size) |> gpu
     V = rand(vdim, source_len, batch_size) |> gpu
 
-    @testset "regular" begin
+    @testset "HopfieldCore" begin
         l = HopfieldCore(emb_dim, heads; kdim=kdim, vdim=vdim,
             head_dim=head_dim, pattern_dim=pattern_dim) |> gpu
         Y = l(Q, K, V)

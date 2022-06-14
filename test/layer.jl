@@ -1,4 +1,4 @@
-@testset "hopfield" begin
+@testset "layer" begin
     heads = 2
     emb_dim = 3
     kdim = 5
@@ -20,7 +20,7 @@
     K = rand(kdim, source_len, batch_size)
     V = rand(vdim, source_len, batch_size)
 
-    @testset "regular" begin
+    @testset "HopfieldCore" begin
         l = HopfieldCore(emb_dim, heads; kdim=kdim, vdim=vdim,
             head_dim=head_dim, pattern_dim=pattern_dim)
         @test l.linear_q isa Dense

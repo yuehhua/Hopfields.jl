@@ -14,6 +14,7 @@ export
 
 include("utils.jl")
 include("operations.jl")
-include("hopfield.jl")
+include("functional.jl")
+include("layer.jl")
 
 end
