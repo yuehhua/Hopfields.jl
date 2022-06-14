@@ -10,6 +10,12 @@
     target_len = 19
     source_len = 23
 
+    in_channel = emb_dim
+    hidden_dim = head_dim
+    out_channel = 29
+    stored_pattern_dim = kdim
+    pattern_projection_dim = vdim
+
     Q = rand(emb_dim, target_len, batch_size)
     K = rand(kdim, source_len, batch_size)
     V = rand(vdim, source_len, batch_size)
@@ -56,6 +62,38 @@
             head_dim=head_dim, pattern_dim=pattern_dim)
         Y = l(nothing, K, V)
         @test size(Y) == (emb_dim, heads*emb_dim, batch_size)
+
+        g = Zygote.gradient(() -> sum(l(nothing, K, V)), Flux.params(l))
+        @test length(g.grads) == 8
+    end
+
+    @testset "Hopfield" begin
+        l = Hopfield(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
+            stored_pattern_dim=stored_pattern_dim,
+            pattern_projection_dim=pattern_projection_dim)
+        Y = l(Q, K, V)
+        @test size(Y) == (out_channel, heads*target_len, batch_size)
+
+        g = Zygote.gradient(() -> sum(l(Q, K, V)), Flux.params(l))
+        @test length(g.grads) == 6
+    end
+
+    @testset "HopfieldLayer" begin
+        l = HopfieldLayer(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
+            stored_pattern_dim=stored_pattern_dim)
+        Y = l(Q, nothing, nothing)
+        @test size(Y) == (out_channel, heads*target_len, batch_size)
+
+        g = Zygote.gradient(() -> sum(l(Q, nothing, nothing)), Flux.params(l))
+        @test length(g.grads) == 8
+    end
+
+    @testset "HopfieldPooling" begin
+        l = HopfieldPooling(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
+            stored_pattern_dim=stored_pattern_dim,
+            pattern_projection_dim=pattern_projection_dim)
+        Y = l(nothing, K, V)
+        @test size(Y) == (out_channel, heads*emb_dim, batch_size)
 
         g = Zygote.gradient(() -> sum(l(nothing, K, V)), Flux.params(l))
         @test length(g.grads) == 8

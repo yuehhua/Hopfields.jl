@@ -9,23 +9,23 @@ Hopfield layer core.
 - `K`: (E, S, B), E is the embedding dimension, S is the source sequence length, B is the batch size
 - `V`: (E, S, B), E is the embedding dimension, S is the source sequence length, B is the batch size
 """
-struct HopfieldCore{B,Q,K,V,O,D<:Real}
+struct HopfieldCore{B,Q,K,V,O,D}
     β::B
     linear_q::Q
     linear_k::K
     linear_v::V
     out_proj::O
-    heads::Int
     dropout::D
+    heads::Int
 end
 
 function HopfieldCore(emb_dim::Int, heads::Int=1;
-    dropout::Real=0., bias::Bool=true, bias_kv=false,
+    dropout::Real=0.f0, bias::Bool=true, bias_kv=false,
     kdim::Int=0, vdim::Int=0, out_dim::Int=0,
     head_dim::Int=0, pattern_dim::Int=0,
-    enable_out_proj::Bool=true,
-    # normalize_pattern::Bool=false, normalize_pattern_affine::Bool=false
-    init=glorot_uniform,
+    enable_out_proj::Bool=true, init=glorot_uniform,
+    normalize_pattern::Bool=false, normalize_pattern_affine::Bool=false,
+    max_iter::Int=0, ϵ::Real=1f-4,
     )
     kdim = (kdim > 0) ? kdim : emb_dim
     vdim = (vdim > 0) ? vdim : emb_dim
@@ -40,7 +40,8 @@ function HopfieldCore(emb_dim::Int, heads::Int=1;
     linear_k = Dense(kdim, virtual_hopfield_dim; bias=bias_kv, init=init)
     linear_v = Dense(vdim, virtual_pattern_dim; bias=bias_kv, init=init)
     out_proj = enable_out_proj ? Dense(virtual_pattern_dim, out_dim; init=init, bias=bias) : identity
-    return HopfieldCore(β, linear_q, linear_k, linear_v, out_proj, heads, dropout)
+    dropout_l = Dropout(dropout; dims=3)
+    return HopfieldCore(β, linear_q, linear_k, linear_v, out_proj, dropout_l, heads)
 end
 
 @functor HopfieldCore
@@ -53,10 +54,12 @@ function (l::HopfieldCore)(query, key, value)
     Vt, v = maybe_layer(l.linear_v, value)
     bch_sz = batch_size(q, k, v)
     β = reshape(repeat(l.β, bch_sz), 1, 1, :)
-    return hopfield_forward(Qt, Kt, Vt, l.out_proj, l.heads, β, q, k, v)
+    return hopfield_forward(Qt, Kt, Vt, l.out_proj, l.dropout, l.heads, β, q, k, v)
 end
 
-function hopfield_forward(Qt, Kt, Vt, out_proj, heads::Int, β::AbstractArray, query::AbstractArray, key::AbstractArray, value::AbstractArray)
+function hopfield_forward(Qt, Kt, Vt, out_proj, dropout, heads::Int,
+    β::AbstractArray, query::AbstractArray, key::AbstractArray, value::AbstractArray)
+
     Q = project(Qt, heads, query)
     K = project(Kt, heads, key)
     V = project(Vt, heads, value)
@@ -65,6 +68,7 @@ function hopfield_forward(Qt, Kt, Vt, out_proj, heads::Int, β::AbstractArray, q
     Â = move_heads_to_first(Â, heads)
     V = move_heads_to_first(V, heads)
 
+    V = dropout(V)
     attn_out = batched_mul(V, batched_transpose(Â))
     return out_proj(attn_out)
 end
@@ -79,4 +83,74 @@ function project(layer, heads::Int, X::AbstractArray)
     X = layer(X)
     X = move_heads_to_last(X, heads)
     return X
+end
+
+# input_dim
+# hidden_dim
+# output_dim
+# pattern_dim
+# stored_pattern_dim = kdim
+# state_pattern_dim = emb_dim
+# pattern_projection_dim = vdim
+# association_matrix
+# projected_pattern_matrix
+
+function Hopfield(ch::Pair{Int,Int}, hidden_dim::Int, pattern_dim::Int, heads::Int;
+    dropout::Real=0.f0, bias::Bool=true, pattern_bias::Bool=false,
+    stored_pattern_dim::Int=0, pattern_projection_dim::Int=0,
+    enable_out_proj::Bool=true, init=glorot_uniform,
+    normalize_hopfield::Bool=false, normalize_hopfield_affine::Bool=false,
+    max_iter::Int=0, ϵ::Real=1f-4,
+    )
+
+    in_ch, out_ch = ch
+    l = HopfieldCore(in_ch, heads; dropout=dropout, bias=bias, bias_kv=pattern_bias,
+        head_dim=hidden_dim, out_dim=out_ch, pattern_dim=pattern_dim,
+        kdim=stored_pattern_dim, vdim=pattern_projection_dim,
+        enable_out_proj=enable_out_proj, init=init,
+        normalize_pattern=normalize_hopfield,
+        normalize_pattern_affine=normalize_hopfield_affine,
+        max_iter=max_iter, ϵ=ϵ,
+    )
+    return l
+end
+
+function HopfieldLayer(ch::Pair{Int,Int}, hidden_dim::Int, pattern_dim::Int, heads::Int;
+    dropout::Real=0.f0, bias::Bool=true, pattern_bias::Bool=false,
+    stored_pattern_dim::Int=0,
+    enable_out_proj::Bool=true, init=glorot_uniform,
+    normalize_hopfield::Bool=false, normalize_hopfield_affine::Bool=false,
+    max_iter::Int=0, ϵ::Real=1f-4,
+    )
+
+    in_ch, out_ch = ch
+    l = HopfieldCore(in_ch, heads; dropout=dropout, bias=bias, bias_kv=pattern_bias,
+        head_dim=hidden_dim, out_dim=out_ch, pattern_dim=pattern_dim,
+        kdim=stored_pattern_dim, vdim=stored_pattern_dim,
+        enable_out_proj=enable_out_proj, init=init,
+        normalize_pattern=normalize_hopfield,
+        normalize_pattern_affine=normalize_hopfield_affine,
+        max_iter=max_iter, ϵ=ϵ,
+    )
+    return l
+end
+
+function HopfieldPooling(ch::Pair{Int,Int}, hidden_dim::Int, pattern_dim::Int, heads::Int;
+    dropout::Real=0.f0, bias::Bool=true, pattern_bias::Bool=false,
+    stored_pattern_dim::Int=0, pattern_projection_dim::Int=0,
+    enable_out_proj::Bool=true, init=glorot_uniform,
+    normalize_hopfield::Bool=false, normalize_hopfield_affine::Bool=false,
+    max_iter::Int=0, ϵ::Real=1f-4,
+    )
+
+    in_ch, out_ch = ch
+    l = HopfieldCore(in_ch, heads; dropout=dropout, bias=bias, bias_kv=pattern_bias,
+        head_dim=hidden_dim, out_dim=out_ch, pattern_dim=pattern_dim,
+        kdim=stored_pattern_dim, vdim=pattern_projection_dim,
+        enable_out_proj=enable_out_proj, init=init,
+        normalize_pattern=normalize_hopfield,
+        normalize_pattern_affine=normalize_hopfield_affine,
+        max_iter=max_iter, ϵ=ϵ,
+    )
+    return l
 end

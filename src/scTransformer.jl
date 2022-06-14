@@ -7,7 +7,10 @@ using Flux: @functor
 using Tullio, KernelAbstractions, CUDAKernels
 
 export
-    HopfieldCore
+    HopfieldCore,
+    Hopfield,
+    HopfieldLayer,
+    HopfieldPooling
 
 include("utils.jl")
 include("operations.jl")
