@@ -9,7 +9,7 @@ Hopfield layer core.
 - `K`: (E, S, B), E is the embedding dimension, S is the source sequence length, B is the batch size
 - `V`: (E, S, B), E is the embedding dimension, S is the source sequence length, B is the batch size
 """
-struct HopfieldCore{B,Q,K,V,O,D}
+struct HopfieldCore{B,Q,K,V,O,D,T}
     β::B
     linear_q::Q
     linear_k::K
@@ -17,6 +17,8 @@ struct HopfieldCore{B,Q,K,V,O,D}
     out_proj::O
     dropout::D
     heads::Int
+    max_iter::Int
+    ϵ::T
 end
 
 function HopfieldCore(emb_dim::Int, heads::Int=1;
@@ -41,7 +43,8 @@ function HopfieldCore(emb_dim::Int, heads::Int=1;
     linear_v = Dense(vdim, virtual_pattern_dim; bias=bias_kv, init=init)
     out_proj = enable_out_proj ? Dense(virtual_pattern_dim, out_dim; init=init, bias=bias) : identity
     dropout_l = Dropout(dropout; dims=3)
-    return HopfieldCore(β, linear_q, linear_k, linear_v, out_proj, dropout_l, heads)
+    return HopfieldCore(β, linear_q, linear_k, linear_v, out_proj,
+        dropout_l, heads, max_iter, ϵ)
 end
 
 @functor HopfieldCore
@@ -85,15 +88,22 @@ function project(layer, heads::Int, X::AbstractArray)
     return X
 end
 
-# input_dim
-# hidden_dim
-# output_dim
-# pattern_dim
-# stored_pattern_dim = kdim
-# state_pattern_dim = emb_dim
-# pattern_projection_dim = vdim
-# association_matrix
-# projected_pattern_matrix
+input_dim(l::HopfieldCore) = size(l.linear_q.weight, 2)
+hidden_dim(l::HopfieldCore) = size(l.linear_k.weight, 1) ÷ heads(l)
+function output_dim(l::HopfieldCore)
+    if l.out_proj == identity
+        return size(l.linear_v.weight, 1)
+    else
+        return size(l.out_proj.weight, 1)
+    end
+end
+pattern_dim(l::HopfieldCore) = size(l.linear_v.weight, 1) ÷ heads(l)
+heads(l::HopfieldCore) = l.heads
+stored_pattern_dim(l::HopfieldCore) = size(l.linear_k.weight, 2)
+state_pattern_dim(l::HopfieldCore) = size(l.linear_q.weight, 2)
+pattern_projection_dim(l::HopfieldCore) = size(l.linear_v.weight, 2)
+# association_matrix(l::HopfieldCore) = 
+# projected_pattern_matrix(l::HopfieldCore) = 
 
 function Hopfield(ch::Pair{Int,Int}, hidden_dim::Int, pattern_dim::Int, heads::Int;
     dropout::Real=0.f0, bias::Bool=true, pattern_bias::Bool=false,
