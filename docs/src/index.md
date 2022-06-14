@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = scTransformer
+CurrentModule = Hopfields
 ```
 
-# scTransformer
+# Hopfields
 
-Documentation for [scTransformer](https://github.com/yuehhua/scTransformer.jl).
+Documentation for [Hopfields](https://github.com/yuehhua/Hopfields.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [scTransformer]
+Modules = [Hopfields]
 ```

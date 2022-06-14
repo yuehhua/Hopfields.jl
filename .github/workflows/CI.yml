@@ -54,6 +54,6 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
-            using scTransformer
-            DocMeta.setdocmeta!(scTransformer, :DocTestSetup, :(using scTransformer); recursive=true)
-            doctest(scTransformer)'
+            using Hopfields
+            DocMeta.setdocmeta!(Hopfields, :DocTestSetup, :(using Hopfields); recursive=true)
+            doctest(Hopfields)'

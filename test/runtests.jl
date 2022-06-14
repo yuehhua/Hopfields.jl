@@ -1,4 +1,4 @@
-using scTransformer
+using Hopfields
 using CUDA
 using Flux
 using Test
@@ -19,7 +19,7 @@ else
     @warn "CUDA unavailable, not testing GPU support"
 end
 
-@testset "scTransformer.jl" begin
+@testset "Hopfields.jl" begin
     for t in tests
         include(t)
     end

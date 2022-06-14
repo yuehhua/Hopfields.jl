@@ -1,4 +1,4 @@
-module scTransformer
+module Hopfields
 
 using CUDA
 using Flux, NNlib, NNlibCUDA

@@ -1,4 +1,4 @@
-name = "scTransformer"
+name = "Hopfields"
 uuid = "6768ce78-dd5b-4160-b677-5994b15e298d"
 authors = ["Yueh-Hua Tu"]
 version = "0.1.0"

@@ -71,6 +71,15 @@
         l = Hopfield(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
             stored_pattern_dim=stored_pattern_dim,
             pattern_projection_dim=pattern_projection_dim)
+        @test Hopfields.input_dim(l) == in_channel
+        @test Hopfields.hidden_dim(l) == hidden_dim
+        @test Hopfields.output_dim(l) == out_channel
+        @test Hopfields.pattern_dim(l) == pattern_dim
+        @test Hopfields.heads(l) == heads
+        @test Hopfields.stored_pattern_dim(l) == stored_pattern_dim
+        @test Hopfields.state_pattern_dim(l) == emb_dim
+        @test Hopfields.pattern_projection_dim(l) == pattern_projection_dim
+
         Y = l(Q, K, V)
         @test size(Y) == (out_channel, heads*target_len, batch_size)
 
@@ -81,6 +90,15 @@
     @testset "HopfieldLayer" begin
         l = HopfieldLayer(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
             stored_pattern_dim=stored_pattern_dim)
+        @test Hopfields.input_dim(l) == in_channel
+        @test Hopfields.hidden_dim(l) == hidden_dim
+        @test Hopfields.output_dim(l) == out_channel
+        @test Hopfields.pattern_dim(l) == pattern_dim
+        @test Hopfields.heads(l) == heads
+        @test Hopfields.stored_pattern_dim(l) == stored_pattern_dim
+        @test Hopfields.state_pattern_dim(l) == emb_dim
+        @test Hopfields.pattern_projection_dim(l) == stored_pattern_dim
+
         Y = l(Q, nothing, nothing)
         @test size(Y) == (out_channel, heads*target_len, batch_size)
 
@@ -92,6 +110,15 @@
         l = HopfieldPooling(in_channel=>out_channel, hidden_dim, pattern_dim, heads;
             stored_pattern_dim=stored_pattern_dim,
             pattern_projection_dim=pattern_projection_dim)
+        @test Hopfields.input_dim(l) == in_channel
+        @test Hopfields.hidden_dim(l) == hidden_dim
+        @test Hopfields.output_dim(l) == out_channel
+        @test Hopfields.pattern_dim(l) == pattern_dim
+        @test Hopfields.heads(l) == heads
+        @test Hopfields.stored_pattern_dim(l) == stored_pattern_dim
+        @test Hopfields.state_pattern_dim(l) == emb_dim
+        @test Hopfields.pattern_projection_dim(l) == pattern_projection_dim
+
         Y = l(nothing, K, V)
         @test size(Y) == (out_channel, heads*emb_dim, batch_size)
 
