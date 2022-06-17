@@ -1,29 +1,51 @@
-function batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,3}) where {T,S}
-    a_dim = size(A, 3)
-    b_dim = size(B, 3)
-
-    if a_dim == b_dim
-        return _batched_innerprod(A, B)
-    elseif a_dim ÷ b_dim > 0 && a_dim % b_dim == 0
-        dims = size(A, 2), size(B, 2)
-        relaxed_A = relax_dims(A, a_dim, b_dim)
-        C = _batched_innerprod(relaxed_A, B)
-        return reshape(C, dims..., :)
-    elseif b_dim ÷ a_dim > 0 && b_dim % a_dim == 0
-        dims = size(A, 2), size(B, 2)
-        relaxed_B = relax_dims(B, b_dim, a_dim)
-        C = _batched_innerprod(A, relaxed_B)
-        return reshape(C, dims..., :)
-    else
-        throw(ArgumentError("not supported array size of $(size(A)) and $(size(B))"))
-    end
+function batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,3}; dims::Int=1) where {T,S}
+    A, B = unsqueeze_batch(A, B)
+    C = batched_innerprod(A, B, Val(dims))
+    return squeeze_batch(C)
 end
 
-_batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,3}) where {T,S} =
+batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,3}, ::Val{1}) where {T,S} =
     batched_mul(batched_transpose(A), B)
 
-_batched_innerprod(A::AbstractArray{T,4}, B::AbstractArray{S,3}) where {T,S} =
+batched_innerprod(A::AbstractArray{T,4}, B::AbstractArray{S,3}, ::Val{1}) where {T,S} =
     @tullio C[i, j, l, b] := A[k, i, l, b] * B[k, j, l]
 
-_batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,4}) where {T,S} =
+batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,4}, ::Val{1}) where {T,S} =
     @tullio C[i, j, l, b] := A[k, i, l] * B[k, j, l, b]
+
+batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,3}, ::Val{2}) where {T,S} =
+    batched_mul(A, batched_transpose(B))
+
+batched_innerprod(A::AbstractArray{T,4}, B::AbstractArray{S,3}, ::Val{2}) where {T,S} =
+    @tullio C[i, j, l, b] := A[i, k, l, b] * B[j, k, l]
+
+batched_innerprod(A::AbstractArray{T,3}, B::AbstractArray{S,4}, ::Val{2}) where {T,S} =
+    @tullio C[i, j, l, b] := A[i, k, l] * B[j, k, l, b]
+
+function masked_select(mask, A, B)
+    mask, A = unsqueeze_batch(mask, A)
+    mask, B = unsqueeze_batch(mask, B)
+    C = ifelse.(mask, A, B)
+    return squeeze_batch(C)
+end
+
+norm2(A::AbstractArray; dims=1) = sqrt.(sum(abs2, A, dims=dims))
+max_norm2(A::AbstractArray) = maximum(norm2(A; dims=(1,2)), dims=4)
+
+function init_active_heads(A::AbstractArray, heads::Int)
+    return fill!(similar(A, Bool, 1, 1, heads), true)
+end
+
+function update_active_heads!(active_heads, step::Int, max_iter::AbstractArray)
+    active_heads .= ((step .< max_iter) .| (max_iter .< 0))
+    return active_heads
+end
+
+function update_active_heads!(active_heads, old_Â::AbstractArray, new_Â::AbstractArray, ϵ::AbstractArray)
+    ΔÂ = reshape(max_norm2(old_Â - new_Â), 1, 1, :)
+    active_heads .&= (ΔÂ .> ϵ)
+    return active_heads
+end
+
+@non_differentiable init_active_heads(x...)
+@non_differentiable update_active_heads!(x...)

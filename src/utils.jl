@@ -30,7 +30,35 @@ batch_size(q::AbstractArray, k, v) = size(q, 3)
 batch_size(q::AbstractMatrix, k::AbstractArray, v) = size(k, 3)
 batch_size(q::AbstractMatrix, k::AbstractMatrix, v::AbstractArray) = size(v, 3)
 
-function relax_dims(X::AbstractArray{T,3}, a_dim::Int, b_dim::Int) where {T}
-    bch_sz = a_dim ÷ b_dim
-    return reshape(X, size(X)[1:2]..., b_dim, bch_sz)
+squeeze_batch(X::AbstractArray) = reshape(X, size(X)[1:2]..., :)
+
+function unsqueeze_batch(A::AbstractArray{T,3}, B::AbstractArray{S,3}) where {T,S}
+    a_dim = size(A, 3)
+    b_dim = size(B, 3)
+
+    if a_dim == b_dim
+        return A, B
+    elseif a_dim ÷ b_dim > 0 && a_dim % b_dim == 0
+        return unsqueeze_batch(A, a_dim, b_dim), B
+    elseif b_dim ÷ a_dim > 0 && b_dim % a_dim == 0
+        return A, unsqueeze_batch(B, b_dim, a_dim)
+    else
+        throw(ArgumentError("not supported array size of $(size(A)) and $(size(B))"))
+    end
 end
+
+function unsqueeze_batch(X::AbstractArray{T,3}, dim1::Int, dim2::Int) where {T}
+    bch_sz = dim1 ÷ dim2
+    return reshape(X, size(X)[1:2]..., dim2, bch_sz)
+end
+
+function init_tensor(A::AbstractArray{<:Real,3}, ::AbstractArray, heads::Int)
+    @assert size(A) == (1, 1, heads)
+    return A
+end
+
+function init_tensor(x::Real, S::AbstractArray, heads::Int)
+    return fill!(similar(S, 1, 1, heads), x)
+end
+
+@non_differentiable init_tensor(x...)

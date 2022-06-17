@@ -57,7 +57,9 @@ function (l::HopfieldCore)(query, key, value)
     Vt, v = maybe_layer(l.linear_v, value)
     bch_sz = batch_size(q, k, v)
     β = reshape(repeat(l.β, bch_sz), 1, 1, :)
-    return hopfield_forward(Qt, Kt, Vt, l.out_proj, l.dropout, l.heads, β, q, k, v)
+    return hopfield_forward(
+        Qt, Kt, Vt, l.out_proj, l.dropout, l.heads,
+        β, q, k, v, l.max_iter, l.ϵ)
 end
 
 input_dim(l::HopfieldCore) = size(l.linear_q.weight, 2)
