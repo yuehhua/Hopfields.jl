@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.2]
+
+- Disable `Dropout` while dropout rate = 0
+
 ## [0.0.1]
 
 - implement modern Hopfield layer
