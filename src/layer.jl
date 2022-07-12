@@ -42,7 +42,7 @@ function HopfieldCore(emb_dim::Int, heads::Int=1;
     linear_k = Dense(kdim, virtual_hopfield_dim; bias=bias_kv, init=init)
     linear_v = Dense(vdim, virtual_pattern_dim; bias=bias_kv, init=init)
     out_proj = enable_out_proj ? Dense(virtual_pattern_dim, out_dim; init=init, bias=bias) : identity
-    dropout_l = (dropout == 0.) ? Dropout(dropout; dims=3) : identity
+    dropout_l = (dropout == 0.) ? identity : Dropout(dropout; dims=3)
     return HopfieldCore(β, linear_q, linear_k, linear_v, out_proj,
         dropout_l, heads, max_iter, ϵ)
 end
