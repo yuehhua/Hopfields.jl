@@ -1,7 +1,7 @@
 name = "Hopfields"
 uuid = "6768ce78-dd5b-4160-b677-5994b15e298d"
 authors = ["Yueh-Hua Tu"]
-version = "0.0.3"
+version = "0.0.4"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
