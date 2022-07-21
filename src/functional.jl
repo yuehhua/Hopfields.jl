@@ -11,7 +11,7 @@ Hopfield layer forward function.
 - `key::AbstractArray`:
 - `value::AbstractArray`:
 - `max_iter`: `-1` for iteration until stable.
-- `ϵ`: 
+- `ϵ`: The error tolerance for convergence.
 """
 function hopfield_forward(Qt, Kt, Vt, out_proj, dropout, heads::Int,
     β::AbstractArray, query::AbstractArray, key::AbstractArray, value::AbstractArray,
@@ -25,11 +25,10 @@ function hopfield_forward(Qt, Kt, Vt, out_proj, dropout, heads::Int,
     
     Â = attention_prob(Q, K, β)
     Â = multiple_updates(Â, Q, K, β, heads, max_iter, ϵ)
-    Â = move_heads_to_first(Â, heads)
-    V = move_heads_to_first(V, heads)
 
     V = dropout(V)
-    attn_out = batched_mul(V, batched_transpose(Â))
+    attn_out = batched_innerprod(V, Â, dims=2)
+    attn_out = move_heads_to_first(attn_out, heads)
     return out_proj(attn_out)
 end
 
